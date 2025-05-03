@@ -16,7 +16,7 @@ import esm
 
 log = utils.get_logger(__name__)
 
-
+### 传入CATH的jsonl数据，输出subsets的datasets和字母集合
 def CATH(
     root=".data",
     chain_set_jsonl='chain_set.jsonl',

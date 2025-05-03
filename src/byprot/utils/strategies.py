@@ -1,16 +1,15 @@
-from typing import Dict, List, Union
+from typing import Dict, List
 
 from pytorch_lightning.strategies import StrategyRegistry
 from pytorch_lightning.strategies.sharded import DDPShardedStrategy
-from torch.optim import Optimizer
-
 from pytorch_lightning.utilities.imports import _FAIRSCALE_AVAILABLE
+from torch.optim import Optimizer
 
 if _FAIRSCALE_AVAILABLE:
     from fairscale.optim import OSS
 
     class DDPShardedFBOStrategy(DDPShardedStrategy):
-        strategy_name = 'ddp_sharded_fbo'
+        strategy_name = "ddp_sharded_fbo"
 
         def __init__(self, force_broadcast_object=True, **kwargs) -> None:
             super().__init__(**kwargs)

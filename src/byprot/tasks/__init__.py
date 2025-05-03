@@ -7,9 +7,6 @@ from typing import Any, Callable, Dict, List, Optional, Union
 
 import numpy as np
 import torch
-from byprot import utils
-from byprot.utils.lr_scheduler import get_scheduler
-from byprot.utils.optim import get_optimizer
 from omegaconf import DictConfig
 from pytorch_lightning import LightningModule
 from pytorch_lightning.utilities.types import _METRIC_COLLECTION
@@ -19,6 +16,9 @@ from torch.nn import functional as F
 from torchmetrics import MaxMetric, MeanMetric, Metric, MinMetric, SumMetric
 from torchmetrics.text.bleu import BLEUScore as BLEU
 
+from byprot import utils
+from byprot.utils.lr_scheduler import get_scheduler
+from byprot.utils.optim import get_optimizer
 
 log = utils.get_logger(__name__)
 
@@ -30,9 +30,9 @@ def on_prediction_mode(pl_module: LightningModule, enable=True):
         return
 
     _methods = [
-        '{}_step',
-        '{}_step_end',
-        '{}_epoch_end',
+        "{}_step",
+        "{}_step_end",
+        "{}_epoch_end",
         # 'on_{}_batch_start',
         # 'on_{}_batch_end',
         # 'on_{}_epoch_start',
@@ -42,7 +42,10 @@ def on_prediction_mode(pl_module: LightningModule, enable=True):
     ]
 
     for _method in _methods:
-        _test_method, _predict_method = _method.format('test'), _method.format('predict')
+        _test_method, _predict_method = (
+            _method.format("test"),
+            _method.format("predict"),
+        )
 
         _test_method_obj = getattr(pl_module, _test_method, None)
         _predict_method_obj = getattr(pl_module, _predict_method, None)
@@ -54,7 +57,10 @@ def on_prediction_mode(pl_module: LightningModule, enable=True):
     yield
 
     for _method in _methods:
-        _test_method, _predict_method = _method.format('test'), _method.format('predict')
+        _test_method, _predict_method = (
+            _method.format("test"),
+            _method.format("predict"),
+        )
 
         _test_method_obj = getattr(pl_module, _test_method, None)
         _predict_method_obj = getattr(pl_module, _predict_method, None)
@@ -116,13 +122,22 @@ class TaskLitModule(LightningModule):
     @property
     def lrate(self):
         for param_group in self.trainer.optimizers[0].param_groups:
-            return param_group['lr']
+            return param_group["lr"]
 
     @property
     def stage(self):
         return self._stage
 
-    def log(self, name: str, value: _METRIC_COLLECTION, prog_bar: bool = False, logger: bool = True, on_step: Optional[bool] = None, on_epoch: Optional[bool] = None, **kwargs) -> None:
+    def log(
+        self,
+        name: str,
+        value: _METRIC_COLLECTION,
+        prog_bar: bool = False,
+        logger: bool = True,
+        on_step: Optional[bool] = None,
+        on_epoch: Optional[bool] = None,
+        **kwargs,
+    ) -> None:
         if on_epoch and not self.training:
             self.valid_logged[name] = value
         return super().log(name, value, prog_bar, logger, on_step, on_epoch, **kwargs)
@@ -134,7 +149,9 @@ class TaskLitModule(LightningModule):
     def training_step(self, batch: Any, batch_idx: int):
         raise NotImplementedError
 
-    def training_step_end(self, step_output: Union[torch.Tensor, Dict[str, Any]]) -> Union[torch.Tensor, Dict[str, Any]]:
+    def training_step_end(
+        self, step_output: Union[torch.Tensor, Dict[str, Any]]
+    ) -> Union[torch.Tensor, Dict[str, Any]]:
         return super().training_step_end(step_output)
 
     def training_epoch_end(self, outputs: List[Any]):
@@ -144,18 +161,24 @@ class TaskLitModule(LightningModule):
     def validation_step(self, batch: Any, batch_idx: int):
         raise NotImplementedError
 
-    def validation_step_end(self, *args, **kwargs) -> Optional[Union[torch.Tensor, Dict[str, Any]]]:
+    def validation_step_end(
+        self, *args, **kwargs
+    ) -> Optional[Union[torch.Tensor, Dict[str, Any]]]:
         return super().validation_step_end(*args, **kwargs)
 
     def validation_epoch_end(self, outputs: List[Any]):
-        logging_info = ", ".join(f"{key}={val:.3f}" for key, val in self.valid_logged.items())
+        logging_info = ", ".join(
+            f"{key}={val:.3f}" for key, val in self.valid_logged.items()
+        )
         logging_info = f"Validation Info @ (Epoch {self.current_epoch}, global step {self.global_step}): {logging_info}"
         log.info(logging_info)
 
     def test_step(self, batch: Any, batch_idx: int):
         return self.validation_step(batch, batch_idx)
 
-    def test_step_end(self, *args, **kwargs) -> Optional[Union[torch.Tensor, Dict[str, Any]]]:
+    def test_step_end(
+        self, *args, **kwargs
+    ) -> Optional[Union[torch.Tensor, Dict[str, Any]]]:
         return self.validation_step_end(*args, **kwargs)
 
     def test_epoch_end(self, outputs: List[Any]):
@@ -180,18 +203,24 @@ class TaskLitModule(LightningModule):
             https://pytorch-lightning.readthedocs.io/en/latest/common/lightning_module.html#configure-optimizers
         """
         optimizer = get_optimizer(self.hparams.optimizer, self.parameters())
-        if 'lr_scheduler' in self.hparams and self.hparams.lr_scheduler is not None:
-            lr_scheduler, extra_kwargs = get_scheduler(self.hparams.lr_scheduler, optimizer)
+        if "lr_scheduler" in self.hparams and self.hparams.lr_scheduler is not None:
+            lr_scheduler, extra_kwargs = get_scheduler(
+                self.hparams.lr_scheduler, optimizer
+            )
             return {
-                'optimizer': optimizer,
-                'lr_scheduler': {"scheduler": lr_scheduler, **extra_kwargs}
+                "optimizer": optimizer,
+                "lr_scheduler": {"scheduler": lr_scheduler, **extra_kwargs},
             }
         return optimizer
 
     # -------# Others #-------- #
     def on_train_epoch_end(self) -> None:
-        if dist.is_initialized() and hasattr(self.trainer.datamodule, 'train_batch_sampler'):
-            self.trainer.datamodule.train_batch_sampler.set_epoch(self.current_epoch + 1)
+        if dist.is_initialized() and hasattr(
+            self.trainer.datamodule, "train_batch_sampler"
+        ):
+            self.trainer.datamodule.train_batch_sampler.set_epoch(
+                self.current_epoch + 1
+            )
             self.trainer.datamodule.train_batch_sampler._build_batches()
 
     def on_epoch_end(self):
@@ -208,13 +237,13 @@ class AutoMetric(nn.Module):
 
     def __init__(self) -> None:
         super().__init__()
-        self.register_parameter('_device', torch.zeros(1))
+        self.register_parameter("_device", torch.zeros(1))
 
     @property
     def device(self):
         return self._device.device
 
-    def update(self, name, value, type='mean', **kwds):
+    def update(self, name, value, type="mean", **kwds):
         if not hasattr(self, name):
             if isinstance(type, str):
                 type = self._type_shortnames[type]
@@ -239,6 +268,7 @@ def register_task(name):
         cls._name_ = name
         TASK_REGISTRY[name] = cls
         return cls
+
     return decorator
 
 

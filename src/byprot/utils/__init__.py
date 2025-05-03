@@ -1,31 +1,32 @@
-from contextlib import contextmanager
-from pathlib import Path
-from copy import deepcopy
 import glob
 import importlib
 import logging
 import os
 import random
-import warnings
 import subprocess
+import warnings
+from contextlib import contextmanager
+from copy import deepcopy
+from pathlib import Path
 from typing import Any, List, Sequence
 
-import numpy as np
 import hydra
+import numpy as np
 import pytorch_lightning as pl
 import rich.syntax
 import rich.tree
 import torch
 from omegaconf import DictConfig, OmegaConf
-from pytorch_lightning import (Callback, LightningDataModule, LightningModule)
-from pytorch_lightning.utilities.seed import isolate_rng
+from pytorch_lightning import Callback, LightningDataModule, LightningModule
 from pytorch_lightning.loggers import LightningLoggerBase, TensorBoardLogger
 from pytorch_lightning.utilities import rank_zero_only
+from pytorch_lightning.utilities.seed import isolate_rng
 
 from . import strategies
-from .config import load_yaml_config, instantiate_from_config, resolve_experiment_config
+from .config import instantiate_from_config, load_yaml_config, resolve_experiment_config
 
 
+## 标准日志，直接用
 def get_logger(name=__name__) -> logging.Logger:
     """Initializes multi-GPU-friendly python command line logger."""
 
@@ -50,17 +51,19 @@ def get_logger(name=__name__) -> logging.Logger:
 log = get_logger(__name__)
 
 
-def load_from_experiment(experiment_save_dir, ckpt='best.ckpt'):
-    cfg_path = Path(experiment_save_dir, '.hydra', 'config.yaml')
+## 读取pl模型和cfg，用于eval
+def load_from_experiment(experiment_save_dir, ckpt="best.ckpt"):
+    cfg_path = Path(experiment_save_dir, ".hydra", "config.yaml")
     cfg = load_yaml_config(str(cfg_path))
-    cfg.ckpt_path = Path(experiment_save_dir, 'checkpoints', ckpt)
+    cfg.ckpt_path = Path(experiment_save_dir, "checkpoints", ckpt)
 
-    pl_module = instantiate_from_config(cfg=cfg.task, group='task', model=cfg.model)
+    pl_module = instantiate_from_config(cfg=cfg.task, group="task", model=cfg.model)
     pl_module.load_from_ckpt(str(cfg.ckpt_path))
 
     return pl_module, cfg
 
 
+## 忽略警告，打印config树，解析配置中所有的变量插值（例如 ${paths.data_dir}）
 def extras(config: DictConfig) -> None:
     """Applies optional utilities, controlled by config flags.
 
@@ -70,7 +73,7 @@ def extras(config: DictConfig) -> None:
     """
     OmegaConf.set_struct(config, False)
     OmegaConf.resolve(config)
-    OmegaConf.register_new_resolver('eval', eval)
+    OmegaConf.register_new_resolver("eval", eval)
 
     # print current git revision sh
     log.info(f"Current git revision hash: {get_git_revision_hash()}")
@@ -87,7 +90,6 @@ def extras(config: DictConfig) -> None:
 
     return config
 
-
 @rank_zero_only
 def print_config(
     config: DictConfig,
@@ -98,7 +100,7 @@ def print_config(
         "callbacks",
         "logger",
         "trainer",
-        "training"
+        "training",
     ),
     resolve: bool = True,
 ) -> None:
@@ -116,7 +118,9 @@ def print_config(
     quee = []
 
     for field in print_order:
-        quee.append(field) if field in config else log.info(f"Field '{field}' not found in config")
+        quee.append(field) if field in config else log.info(
+            f"Field '{field}' not found in config"
+        )
 
     for field in config:
         if field not in quee:
@@ -137,8 +141,10 @@ def print_config(
 
     with open("config_tree.log", "w") as file:
         rich.print(tree, file=file)
+## 忽略警告，打印config树，解析配置中所有的变量插值（例如 ${paths.data_dir}）
 
 
+# 选择配置的相关部分，并使用已配置的 PyTorch Lightning 日志记录器（如 TensorBoard, WandB）将它们记录为超参数
 @rank_zero_only
 def log_hyperparameters(
     config: DictConfig,
@@ -187,6 +193,7 @@ def log_hyperparameters(
     trainer.logger.log_hyperparams(hparams)
 
 
+# 执行wandb.finish() 确保Weights & Biases所有内容都正确关闭
 def finish(
     config: DictConfig,
     model: pl.LightningModule,
@@ -205,15 +212,20 @@ def finish(
             wandb.finish()
 
 
+## 返回: 实例化的 datamodule, pl_module, logger 列表, 和 callbacks 列表。
 def common_pipeline(config, training=False):
     # Init lightning datamodule
     log.info(f"Instantiating datamodule <{config.datamodule._target_}>")
-    datamodule: LightningDataModule = instantiate_from_config(cfg=config.datamodule, group='datamodule')
+    datamodule: LightningDataModule = instantiate_from_config(
+        cfg=config.datamodule, group="datamodule"
+    )
 
     # Init lightning model as task
     log.info(f"Instantiating task (pl_module) <{config.task._target_}>")
     # pl_module: LightningModule = hydra.utils.instantiate(config.task, model=model)
-    pl_module: LightningModule = instantiate_from_config(cfg=config.task, group='task', model=config.model)
+    pl_module: LightningModule = instantiate_from_config(
+        cfg=config.task, group="task", model=config.model
+    )
 
     # Init lightning loggers
     logger: List[LightningLoggerBase] = []
@@ -228,7 +240,7 @@ def common_pipeline(config, training=False):
                 if isinstance(lg, TensorBoardLogger):
                     hparams_file = os.path.join(lg.log_dir, lg.NAME_HPARAMS_FILE)
                     os.makedirs(lg.log_dir, exist_ok=True)
-                    open(hparams_file, 'w').close()
+                    open(hparams_file, "w").close()
 
     # Init lightning callbacks
     callbacks: List[Callback] = []
@@ -239,13 +251,15 @@ def common_pipeline(config, training=False):
             if "_target_" in cb_conf:
                 log.info(f"Instantiating callback <{cb_conf._target_}>")
                 callbacks.append(hydra.utils.instantiate(cb_conf))
-        if config.trainer.get('enable_progress_bar', False):
+        if config.trainer.get("enable_progress_bar", False):
             from byprot.utils.callbacks import BetterRichProgressBar
+
             callbacks.append(BetterRichProgressBar(leave=False))
 
     return datamodule, pl_module, logger, callbacks
 
 
+# 目的: 尝试为给定的检查点路径（可能是相对路径）找到绝对路径。
 def resolve_ckpt_path(ckpt_dir, ckpt_path):
     # if not absolute path, it should be inferred from current working directory or ckeckpoint directory
     if not os.path.isabs(ckpt_path):
@@ -257,16 +271,15 @@ def resolve_ckpt_path(ckpt_dir, ckpt_path):
 
         # or if ckpt_path is in the predefined checkpoint directory
         elif os.path.exists(os.path.join(ckpt_dir, ckpt_path)):
-            ckpt_path = os.path.abspath(
-                os.path.join(ckpt_dir, ckpt_path)
-            )
+            ckpt_path = os.path.abspath(os.path.join(ckpt_dir, ckpt_path))
 
     return ckpt_path
 
 
+## 递归地遍历嵌套的 Python 对象（列表、元组、字典），并将其中包含的任何 torch.Tensor 移动到指定的 device（cpu 或 GPU ID）。直接用
 def recursive_to(obj, device):
     if isinstance(obj, torch.Tensor):
-        if device == 'cpu':
+        if device == "cpu":
             return obj.cpu()
         try:
             return obj.cuda(device=device, non_blocking=True)
@@ -311,8 +324,9 @@ def recursive_eval(obj):
         return _obj
 
 
+## 这通常用于自动注册自定义类（如模型、数据集、回调），
 def import_modules(models_dir, namespace, excludes=[]):
-    for path in glob.glob(models_dir + '/**', recursive=True)[1:]:
+    for path in glob.glob(models_dir + "/**", recursive=True)[1:]:
         if any(e in path for e in excludes):
             continue
 
@@ -324,15 +338,22 @@ def import_modules(models_dir, namespace, excludes=[]):
         ):
             module_name = file[: file.find(".py")] if file.endswith(".py") else file
 
-            _namespace = path.replace('/', '.')
-            _namespace = _namespace[_namespace.find(namespace): _namespace.rfind('.' + module_name)]
+            _namespace = path.replace("/", ".")
+            _namespace = _namespace[
+                _namespace.find(namespace) : _namespace.rfind("." + module_name)
+            ]
             importlib.import_module(_namespace + "." + module_name)
 
 
 def get_git_revision_hash() -> str:
     from pathlib import Path
+
     REPO_DIR = str(Path(__file__).resolve().parents[2])
-    return subprocess.check_output(['git', '-C', REPO_DIR, 'rev-parse', 'HEAD']).decode('ascii').strip()
+    return (
+        subprocess.check_output(["git", "-C", REPO_DIR, "rev-parse", "HEAD"])
+        .decode("ascii")
+        .strip()
+    )
 
 
 def seed_everything(seed, verbose=False) -> int:
@@ -363,6 +384,7 @@ def seed_everything(seed, verbose=False) -> int:
     return seed
 
 
+# 允许在临时设置特定随机种子的情况下运行代码块，之后恢复原始的随机状态。
 @contextmanager
 def local_seed(seed, enable=True):
     if enable:

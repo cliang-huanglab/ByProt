@@ -89,6 +89,52 @@ class Alphabet(object):
 
 
 # modified from protein mpnn
+# {
+#     # PDB文件名（不含路径和扩展名）
+#     'name': '1abc',
+    
+#     # 处理的链数量
+#     'num_of_chains': 2,
+    
+#     # 所有链连接在一起的氨基酸序列
+#     'seq': 'MKWVTFISLLFLFSSAYSRGVFRRDAHKSEVAHRFKDLGEENFKALVLIAFAQYLQQCPFEDHVKLVNEVTEFAKTCVADESAENCDKS',
+    
+#     # 所有链的原子坐标合并数组，形状为[残基数*链数, 原子数, 3]
+#     'coords': array([[[ 24.969,  12.341,  18.656],
+#                       [ 25.897,  12.846,  17.618],
+#                       [ 25.569,  12.343,  16.300],
+#                       [ 26.118,  12.992,  15.373]],
+#                       ...
+#                     ], dtype=float32),
+    
+#     # 掩码链列表
+#     'masked_list': ['A', 'B'],
+    
+#     # 可见链列表
+#     'visible_list': [],
+    
+#     # A链的氨基酸序列
+#     'seq_chain_A': 'MKWVTFISLLFLFSSAYSRGVFRRD',
+    
+#     # B链的氨基酸序列
+#     'seq_chain_B': 'AHKSEVAHRFKDLGEENFKALVLIAFAQYLQQCPFEDHVKLVNEVTEFAKTCVADESAENCDKS',
+    
+#     # A链的原子坐标信息
+#     'coords_chain_A': {
+#         'N_chain_A': [[24.969, 12.341, 18.656], ...],  # N原子坐标列表
+#         'CA_chain_A': [[25.897, 12.846, 17.618], ...], # CA原子坐标列表
+#         'C_chain_A': [[25.569, 12.343, 16.300], ...],  # C原子坐标列表
+#         'O_chain_A': [[26.118, 12.992, 15.373], ...]   # O原子坐标列表
+#     },
+    
+#     # B链的原子坐标信息
+#     'coords_chain_B': {
+#         'N_chain_B': [[30.123, 15.467, 20.789], ...],
+#         'CA_chain_B': [[31.234, 15.890, 21.456], ...],
+#         'C_chain_B': [[32.345, 16.234, 20.567], ...],
+#         'O_chain_B': [[33.456, 16.789, 20.890], ...]
+#     }
+# }
 class DataProcessor(object):
     def parse_PDB(self, path_to_pdb, input_chain_list=None, masked_chain_list=None, ca_only=False):
         c=0

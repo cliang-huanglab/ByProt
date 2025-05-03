@@ -3,17 +3,14 @@ from typing import Dict
 
 import pytorch_lightning as pl
 import torch
+from omegaconf import OmegaConf
 from pytorch_lightning import callbacks
 from pytorch_lightning.utilities.imports import _RICH_AVAILABLE
 from pytorch_lightning.utilities.rank_zero import (
-    rank_zero_deprecation,
     rank_zero_info,
-    rank_zero_warn,
 )
 from rich import reconfigure
 from torch import Tensor
-from omegaconf import OmegaConf
-
 
 if _RICH_AVAILABLE:
     from pytorch_lightning.callbacks.progress.rich_progress import (
@@ -29,9 +26,10 @@ if _RICH_AVAILABLE:
         if float_value.is_integer():
             return round(float_value)
         elif float_value < 1e-3:
-            return f'{float_value:.2e}' 
+            return f"{float_value:.2e}"
         else:
             return round(float_value, 3)
+
     class BetterMetricsTextColumn(MetricsTextColumn):
         """A column containing text."""
 
@@ -45,7 +43,9 @@ if _RICH_AVAILABLE:
             if self._trainer.training and task.id not in self._tasks:
                 self._tasks[task.id] = "None"
                 if self._renderable_cache:
-                    self._tasks[self._current_task_id] = self._renderable_cache[self._current_task_id][1]
+                    self._tasks[self._current_task_id] = self._renderable_cache[
+                        self._current_task_id
+                    ][1]
                 self._current_task_id = task.id
             if self._trainer.training and task.id != self._current_task_id:
                 return self._tasks[task.id]
@@ -63,7 +63,9 @@ if _RICH_AVAILABLE:
                 reconfigure(**self._console_kwargs)
                 self._console = get_console()
                 self._console.clear_live()
-                self._metric_component = BetterMetricsTextColumn(trainer, self.theme.metrics)
+                self._metric_component = BetterMetricsTextColumn(
+                    trainer, self.theme.metrics
+                )
                 self.progress = CustomProgress(
                     *self.configure_columns(trainer),
                     self._metric_component,
@@ -74,7 +76,7 @@ if _RICH_AVAILABLE:
                 self.progress.start()
                 # progress has started
                 self._progress_stopped = False
-    
+
 
 class ValEveryNSteps(pl.Callback):
     def __init__(self, every_n_step):
@@ -83,6 +85,7 @@ class ValEveryNSteps(pl.Callback):
     def on_batch_end(self, trainer, pl_module):
         if trainer.global_step % self.every_n_step == 0 and trainer.global_step != 0:
             trainer.validate()
+
 
 class CheckpointEveryNSteps(pl.Callback):
     """
@@ -109,7 +112,7 @@ class CheckpointEveryNSteps(pl.Callback):
         self.use_modelcheckpoint_filename = use_modelcheckpoint_filename
 
     def on_batch_end(self, trainer: pl.Trainer, _):
-        """ Check if we should save a checkpoint after every train batch """
+        """Check if we should save a checkpoint after every train batch"""
         epoch = trainer.current_epoch
         global_step = trainer.global_step
         if global_step % self.save_step_frequency == 0:
@@ -120,8 +123,8 @@ class CheckpointEveryNSteps(pl.Callback):
             ckpt_path = os.path.join(trainer.checkpoint_callback.dirpath, filename)
             trainer.save_checkpoint(ckpt_path)
 
-class ModelCheckpoint(callbacks.ModelCheckpoint):
 
+class ModelCheckpoint(callbacks.ModelCheckpoint):
     CHECKPOINT_NAME_BEST = "best"
 
     @classmethod
@@ -132,16 +135,25 @@ class ModelCheckpoint(callbacks.ModelCheckpoint):
         prefix: str = "",
         auto_insert_metric_name: bool = True,
     ) -> str:
-        filename = super()._format_checkpoint_name(filename, metrics, prefix, auto_insert_metric_name)
-        filename = filename.replace('/', '_') # avoid '/' in filename unexpectedly creates folder
+        filename = super()._format_checkpoint_name(
+            filename, metrics, prefix, auto_insert_metric_name
+        )
+        filename = filename.replace(
+            "/", "_"
+        )  # avoid '/' in filename unexpectedly creates folder
         return filename
 
-    def on_train_start(self, trainer: "pl.Trainer", pl_module: "pl.LightningModule") -> None:
+    def on_train_start(
+        self, trainer: "pl.Trainer", pl_module: "pl.LightningModule"
+    ) -> None:
         super().on_train_start(trainer, pl_module)
         trainer.callback_metrics[self.monitor] = self.best_model_score
 
     def _update_best_and_save(
-        self, current: Tensor, trainer: "pl.Trainer", monitor_candidates: Dict[str, Tensor]
+        self,
+        current: Tensor,
+        trainer: "pl.Trainer",
+        monitor_candidates: Dict[str, Tensor],
     ) -> None:
         k = len(self.best_k_models) + 1 if self.save_top_k == -1 else self.save_top_k
 
@@ -152,9 +164,13 @@ class ModelCheckpoint(callbacks.ModelCheckpoint):
 
         # do not save nan, replace with +/- inf
         if isinstance(current, Tensor) and torch.isnan(current):
-            current = torch.tensor(float("inf" if self.mode == "min" else "-inf"), device=current.device)
+            current = torch.tensor(
+                float("inf" if self.mode == "min" else "-inf"), device=current.device
+            )
 
-        filepath = self._get_metric_interpolated_filepath_name(monitor_candidates, trainer, del_filepath)
+        filepath = self._get_metric_interpolated_filepath_name(
+            monitor_candidates, trainer, del_filepath
+        )
 
         # save the current score
         self.current_score = current
@@ -163,7 +179,9 @@ class ModelCheckpoint(callbacks.ModelCheckpoint):
         if len(self.best_k_models) == k:
             # monitor dict has reached k elements
             _op = max if self.mode == "min" else min
-            self.kth_best_model_path = _op(self.best_k_models, key=self.best_k_models.get)  # type: ignore[arg-type]
+            self.kth_best_model_path = _op(
+                self.best_k_models, key=self.best_k_models.get
+            )  # type: ignore[arg-type]
             self.kth_value = self.best_k_models[self.kth_best_model_path]
 
         _op = min if self.mode == "min" else max
@@ -182,19 +200,24 @@ class ModelCheckpoint(callbacks.ModelCheckpoint):
         # update best checkpoint
         if self.best_model_path == filepath:
             self._save_checkpoint(
-                trainer, 
-                self.format_checkpoint_name(monitor_candidates, self.CHECKPOINT_NAME_BEST)
+                trainer,
+                self.format_checkpoint_name(
+                    monitor_candidates, self.CHECKPOINT_NAME_BEST
+                ),
             )
 
         if del_filepath is not None and filepath != del_filepath:
             trainer.strategy.remove_checkpoint(del_filepath)
 
-
-    def _save_last_checkpoint(self, trainer: "pl.Trainer", monitor_candidates: Dict[str, Tensor]) -> None:
+    def _save_last_checkpoint(
+        self, trainer: "pl.Trainer", monitor_candidates: Dict[str, Tensor]
+    ) -> None:
         if not self.save_last:
             return
 
-        filepath = self.format_checkpoint_name(monitor_candidates, self.CHECKPOINT_NAME_LAST)
+        filepath = self.format_checkpoint_name(
+            monitor_candidates, self.CHECKPOINT_NAME_LAST
+        )
 
         # set the last model path before saving because it will be part of the state.
         previous, self.last_model_path = self.last_model_path, filepath
@@ -204,10 +227,11 @@ class ModelCheckpoint(callbacks.ModelCheckpoint):
 
 
 class TrackNorms(pl.Callback):
-
     # TODO do callbacks happen before or after the method in the main LightningModule?
     # @rank_zero_only # needed?
-    def on_after_training_step(self, batch, batch_idx, trainer: pl.Trainer, pl_module: pl.LightningModule):
+    def on_after_training_step(
+        self, batch, batch_idx, trainer: pl.Trainer, pl_module: pl.LightningModule
+    ):
         # Log extra metrics
         metrics = {}
 
@@ -223,16 +247,17 @@ class TrackNorms(pl.Callback):
             sync_dist=True,
         )
 
-
     def on_after_backward(self, trainer: pl.Trainer, pl_module: pl.LightningModule):
         # example to inspect gradient information in tensorboard
-        if OmegaConf.select(trainer.hparams, 'trainer.track_grad_norms'): # TODO dot notation should work with omegaconf?
+        if OmegaConf.select(
+            trainer.hparams, "trainer.track_grad_norms"
+        ):  # TODO dot notation should work with omegaconf?
             norms = {}
             for name, p in pl_module.named_parameters():
                 if p.grad is None:
                     continue
 
                 # param_norm = float(p.grad.data.norm(norm_type))
-                param_norm = torch.mean(p.grad.data ** 2)
+                param_norm = torch.mean(p.grad.data**2)
                 norms[f"grad_norm.{name}"] = param_norm
             pl_module._grad_norms = norms

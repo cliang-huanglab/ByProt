@@ -1,14 +1,12 @@
 import importlib
-import os
-from contextlib import contextmanager
-from copy import deepcopy
-from pathlib import Path
-from typing import Any, List, Sequence
 import logging
-from pytorch_lightning.utilities import rank_zero_only
+import os
+from typing import Any
 
 import hydra
 from omegaconf import DictConfig, OmegaConf
+from pytorch_lightning.utilities import rank_zero_only
+
 
 def get_logger(name=__name__) -> logging.Logger:
     """Initializes multi-GPU-friendly python command line logger."""
@@ -53,7 +51,12 @@ def load_yaml_config(fpath: str) -> OmegaConf:
 def parse_cli_override_args():
     _overrides = OmegaConf.from_cli()
     print(_overrides)
-    overrides = compose_config(**{kk if not kk.startswith('+') else kk[1:]: vv for kk, vv in _overrides.items()})
+    overrides = compose_config(
+        **{
+            kk if not kk.startswith("+") else kk[1:]: vv
+            for kk, vv in _overrides.items()
+        }
+    )
     return overrides
 
 
@@ -61,8 +64,11 @@ def resolve_experiment_config(config: DictConfig):
     # Load train config from existing Hydra experiment
     if config.experiment_path is not None:
         config.experiment_path = hydra.utils.to_absolute_path(config.experiment_path)
-        experiment_config = OmegaConf.load(os.path.join(config.experiment_path, '.hydra', 'config.yaml'))
+        experiment_config = OmegaConf.load(
+            os.path.join(config.experiment_path, ".hydra", "config.yaml")
+        )
         from omegaconf import open_dict
+
         with open_dict(config):
             config.datamodule = experiment_config.datamodule
             config.model = experiment_config.model
@@ -88,6 +94,7 @@ def _convert_target_to_string(t: Any) -> Any:
         return t
 
 
+## 目的 (Purpose): 这个函数的主要目的是将一个表示 Python 对象（通常是类或函数）完整路径的字符串，转换成实际的 Python 对象本身。
 def get_obj_from_str(string, reload=False):
     module, cls = string.rsplit(".", 1)
     if reload:
@@ -96,6 +103,7 @@ def get_obj_from_str(string, reload=False):
     return getattr(importlib.import_module(module, package=None), cls)
 
 
+## 它集成了自定义注册表 (registry) 的功能。
 def instantiate_from_config(cfg: OmegaConf, group=None, **override_kwargs):
     if "_target_" not in cfg:
         raise KeyError("Expected key `_target_` to instantiate.")
@@ -104,11 +112,13 @@ def instantiate_from_config(cfg: OmegaConf, group=None, **override_kwargs):
         return hydra.utils.instantiate(cfg, **override_kwargs)
     else:
         from . import registry
-        _target_ = cfg.pop('_target_')
+
+        _target_ = cfg.pop("_target_")
         target = registry.get_module(group_name=group, module_name=_target_)
         if target is None:
             raise KeyError(
-                f'{_target_} is not a registered <{group}> class [{registry.get_registered_modules(group)}].')
+                f"{_target_} is not a registered <{group}> class [{registry.get_registered_modules(group)}]."
+            )
         target = _convert_target_to_string(target)
         log.info(f"    Resolving {group} <{_target_}> -> <{target}>")
 
