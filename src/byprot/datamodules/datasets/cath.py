@@ -302,50 +302,6 @@ def new_arange(x, *size):
     return torch.arange(size[-1], device=x.device).expand(*size).contiguous()
 
 
-class ToSabdabDataFormat(object):
-    def __init__(self, alphabet) -> None:
-        self.alphabet_ori = alphabet
-
-        from byprot.utils.protein import constants
-        UNK = constants.ressymb_to_resindex['X']
-        self.aa_map = {}
-        for ind, tok in enumerate(alphabet.all_toks):
-            if tok != '<pad>':
-                self.aa_map[ind] = constants.ressymb_to_resindex.get(tok, UNK)
-            else:
-                self.aa_map[ind] = 21
-
-    def _map_aatypes(self, tokens):
-        sizes = tokens.size()
-        mapped_aa_flat = tokens.new_tensor([self.aa_map[ind] for ind in tokens.flatten().tolist()])
-        return mapped_aa_flat.reshape(*sizes)
-
-    def __call__(self, batch_data) -> Any:
-        """
-            coords          -> `pos_heavyatom` [B, num_res, num_atom, 3]
-            tokens          -> `aa` [B, num_res]
-            coord_mask      -> `mask_heavyatom` [B, num_res, num_atom]
-            all_zeros       -> `mask` [B, num_res]
-            all_zeros       -> `chain_nb` [B, num_res]
-            range           -> `res_nb` [B, num_res]
-            coord_mask      -> `generate_flag` [B, num_res]
-            all_ones        -> `fragment_type` [B, num_res]
-
-            coord_padding_mask: coord_padding_mask
-            confidence: confidence,
-        """
-
-        batch_data['pos_heavyatom'] = batch_data.pop('coords')
-        batch_data['aa'] = self._map_aatypes(batch_data.pop('tokens'))
-        batch_data['mask'] = batch_data.pop('coord_mask').bool()
-        batch_data['mask_heavyatom'] = batch_data['mask'][:, :, None].repeat(1, 1, batch_data['pos_heavyatom'].shape[2])
-        batch_data['chain_nb'] = torch.full_like(batch_data['aa'], fill_value=0, dtype=torch.int64)
-        batch_data['res_nb'] = new_arange(batch_data['aa'])
-        batch_data['generate_flag'] = batch_data['mask'].clone()
-        batch_data['fragment_type'] = torch.full_like(batch_data['aa'], fill_value=1, dtype=torch.int64)
-
-        return batch_data
-
 
 def ToPiFoldFormat(X, S, cfd, pad_special_tokens=False):
     mask = torch.isfinite(torch.sum(X, [-2, -1]))  # atom mask

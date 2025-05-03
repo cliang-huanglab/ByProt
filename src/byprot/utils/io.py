@@ -126,5 +126,3 @@ def get_atom_coords_residuewise(atoms: List[str], struct: biotite.structure.Atom
     return biotite.structure.apply_residue_wise(struct, struct, filterfn)
 
 
-def save_pdb(path, coords, seq):
-    pass

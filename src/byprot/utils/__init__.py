@@ -51,17 +51,6 @@ def get_logger(name=__name__) -> logging.Logger:
 log = get_logger(__name__)
 
 
-## 读取pl模型和cfg，用于eval
-def load_from_experiment(experiment_save_dir, ckpt="best.ckpt"):
-    cfg_path = Path(experiment_save_dir, ".hydra", "config.yaml")
-    cfg = load_yaml_config(str(cfg_path))
-    cfg.ckpt_path = Path(experiment_save_dir, "checkpoints", ckpt)
-
-    pl_module = instantiate_from_config(cfg=cfg.task, group="task", model=cfg.model)
-    pl_module.load_from_ckpt(str(cfg.ckpt_path))
-
-    return pl_module, cfg
-
 
 ## 忽略警告，打印config树，解析配置中所有的变量插值（例如 ${paths.data_dir}）
 def extras(config: DictConfig) -> None:
@@ -294,34 +283,6 @@ def recursive_to(obj, device):
 
     else:
         return obj
-
-
-def recursive_apply(obj, fn):
-    if isinstance(obj, torch.Tensor):
-        return fn(obj)
-    elif isinstance(obj, list):
-        return [recursive_to(o, fn=fn) for o in obj]
-    elif isinstance(obj, tuple):
-        return tuple(recursive_to(o, fn=fn) for o in obj)
-    elif isinstance(obj, dict):
-        return {k: recursive_to(v, fn=fn) for k, v in obj.items()}
-    else:
-        raise TypeError(type(obj))
-
-
-def recursive_eval(obj):
-    if isinstance(obj, list):
-        return [recursive_eval(o) for o in obj]
-    elif isinstance(obj, tuple):
-        return tuple(recursive_eval(o) for o in obj)
-    elif isinstance(obj, dict):
-        return {k: recursive_eval(v) for k, v in obj.items()}
-    else:
-        try:
-            _obj = eval(obj)
-        except:
-            pass
-        return _obj
 
 
 ## 这通常用于自动注册自定义类（如模型、数据集、回调），

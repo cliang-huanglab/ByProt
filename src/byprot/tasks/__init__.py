@@ -95,23 +95,6 @@ class TaskLitModule(LightningModule):
 
         self.save_hyperparameters(logger=True)
 
-        # model
-        # self.model = model
-
-        # loss function
-        self.criterion = criterion
-
-        # use separate metric instance for train, val and test step
-        # to ensure a proper reduction over the epoch
-        # self.eval_loss_sum = SumMetric()
-        # self.eval_nll_sum = SumMetric()
-        # self.eval_sample_size = SumMetric()
-        # self.bleu = BLEU(n_gram=4, )
-
-        # for logging best so far validation accuracy
-        # self.val_ppl_best = MinMetric()
-        # self.bleu_best = MaxMetric()
-        # self.metrics = AutoMetric()
 
         self.valid_logged = {}
 
@@ -227,37 +210,6 @@ class TaskLitModule(LightningModule):
         pass
 
 
-class AutoMetric(nn.Module):
-    _type_shortnames = dict(
-        mean=MeanMetric,
-        sum=SumMetric,
-        max=MaxMetric,
-        min=MinMetric,
-    )
-
-    def __init__(self) -> None:
-        super().__init__()
-        self.register_parameter("_device", torch.zeros(1))
-
-    @property
-    def device(self):
-        return self._device.device
-
-    def update(self, name, value, type="mean", **kwds):
-        if not hasattr(self, name):
-            if isinstance(type, str):
-                type = self._type_shortnames[type]
-            setattr(self, name, type(**kwds))
-
-            getattr(self, name).to(self.device)
-
-        getattr(self, name).update(value)
-
-    def compute(self, name):
-        return getattr(self, name).compute()
-
-    def reset(self, name):
-        getattr(self, name).reset()
 
 
 TASK_REGISTRY = {}
